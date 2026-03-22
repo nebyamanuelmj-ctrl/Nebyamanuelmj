@@ -1,8 +1,37 @@
 import { GoogleGenAI } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
+function getAI() {
+  // Use process.env.API_KEY if available (from platform dialog), 
+  // otherwise fallback to process.env.GEMINI_API_KEY
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || '';
+  return new GoogleGenAI({ apiKey });
+}
+
+function handleGeminiError(error: any, fallbackMessage: string) {
+  // Log it for debugging
+  console.error("Gemini Error Details:", error);
+  
+  // Check for rate limit error (429) in various possible structures
+  const message = error?.message || "";
+  const code = error?.code || error?.status || error?.error?.code;
+  const status = error?.status || error?.error?.status;
+  
+  const isRateLimit = 
+    code === 429 || 
+    status === "RESOURCE_EXHAUSTED" || 
+    message.includes("429") || 
+    message.includes("RESOURCE_EXHAUSTED") ||
+    JSON.stringify(error).includes("429");
+
+  if (isRateLimit) {
+    return "The AI is currently resting due to high demand (Rate Limit reached). Please try again in a few minutes, or use the 'Select API Key' option in the Help Center for uninterrupted access.";
+  }
+  
+  return fallbackMessage;
+}
 
 export async function getConnectTheDots(mood: string, food: string, stressLevel: number) {
+  const ai = getAI();
   const model = "gemini-3-flash-preview";
   const prompt = `As a Holistic Resilience Architect (performance coach), explain the connection between these inputs:
   Mood: ${mood}
@@ -25,12 +54,12 @@ export async function getConnectTheDots(mood: string, food: string, stressLevel:
     });
     return response.text || "Connection logic loading...";
   } catch (error) {
-    console.error("Gemini Error:", error);
-    return "The dots are currently disconnected. Try again in a moment.";
+    return handleGeminiError(error, "The dots are currently disconnected. Try again in a moment.");
   }
 }
 
 export async function getAdaptiveWins(stressLevel: number) {
+  const ai = getAI();
   const model = "gemini-3-flash-preview";
   const prompt = `As a Holistic Resilience Architect, generate 3 personalized "Daily Wins" for a high-achiever with a stress level of ${stressLevel}/10.
   One for Mind (Psychology), one for Fuel (Nutrition), and one for Body (Stress Regulation).
@@ -53,7 +82,10 @@ export async function getAdaptiveWins(stressLevel: number) {
     });
     return JSON.parse(response.text || "[]");
   } catch (error) {
-    console.error("Gemini Error:", error);
+    // Detect rate limit even for JSON responses to log it correctly
+    handleGeminiError(error, "");
+    
+    // For JSON responses, we return the static fallback
     return [
       { title: "Deep Breath", description: "Take 3 conscious breaths.", category: "body" },
       { title: "Hydrate", description: "Drink 500ml of water.", category: "fuel" },
@@ -63,6 +95,7 @@ export async function getAdaptiveWins(stressLevel: number) {
 }
 
 export async function getSourceOfTheDay() {
+  const ai = getAI();
   const model = "gemini-3-flash-preview";
   const prompt = `Generate a "Source of the Day" notification for a high-end wellness app.
   It should be inspired by one of these books: 
@@ -85,11 +118,13 @@ export async function getSourceOfTheDay() {
     });
     return response.text || "Today's tip is loading...";
   } catch (error) {
-    return "Today's Stress Killer is inspired by 'The Body Keeps the Score': Try 30 seconds of jumping jacks to reset your nervous system.";
+    const msg = handleGeminiError(error, "Today's Stress Killer is inspired by 'The Body Keeps the Score': Try 30 seconds of jumping jacks to reset your nervous system.");
+    return msg;
   }
 }
 
 export async function searchBookIdea(query: string) {
+  const ai = getAI();
   const model = "gemini-3-flash-preview";
   const prompt = `Search for and explain this idea from the context of high-performance wellness books (like 'Atomic Habits', 'The Glucose Revolution', 'The Body Keeps the Score', etc.): ${query}
   
@@ -113,9 +148,9 @@ export async function searchBookIdea(query: string) {
       sources: Array.from(new Set(sources)) as string[]
     };
   } catch (error) {
-    console.error("Gemini Search Error:", error);
+    const msg = handleGeminiError(error, "The search system is currently offline. Please try again later.");
     return {
-      text: "The search system is currently offline. Please try again later.",
+      text: msg,
       sources: []
     };
   }

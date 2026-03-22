@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, HelpCircle, AlertTriangle, Book, Settings, Mail, ChevronRight, ExternalLink, Wind, Shield, Lock } from 'lucide-react';
+import { X, HelpCircle, AlertTriangle, Book, Settings, Mail, ChevronRight, ExternalLink, Wind, Shield, Lock, Key, CheckCircle2, Sparkles } from 'lucide-react';
 
 interface HelpCenterModalProps {
   onClose: () => void;
@@ -8,8 +8,36 @@ interface HelpCenterModalProps {
   onStartBreathing: () => void;
 }
 
+declare global {
+  interface Window {
+    aistudio: {
+      hasSelectedApiKey: () => Promise<boolean>;
+      openSelectKey: () => Promise<void>;
+    };
+  }
+}
+
 export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({ onClose, onOpenPrivacy, onStartBreathing }) => {
   const [activeTopic, setActiveTopic] = useState<number | null>(null);
+  const [hasKey, setHasKey] = useState(false);
+
+  useEffect(() => {
+    const checkKey = async () => {
+      if (window.aistudio) {
+        const selected = await window.aistudio.hasSelectedApiKey();
+        setHasKey(selected);
+      }
+    };
+    checkKey();
+  }, []);
+
+  const handleSelectKey = async () => {
+    if (window.aistudio) {
+      await window.aistudio.openSelectKey();
+      // Assume success as per instructions
+      setHasKey(true);
+    }
+  };
 
   const faqTopics = [
     {
@@ -187,6 +215,52 @@ export const HelpCenterModal: React.FC<HelpCenterModalProps> = ({ onClose, onOpe
                     </AnimatePresence>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            {/* Advanced Section: API Key */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2 text-brand-ink">
+                <Key size={18} className="text-orange-500" />
+                <h3 className="font-bold text-lg">Advanced Settings</h3>
+              </div>
+              <div className="p-6 bg-orange-50/50 border border-orange-100 rounded-3xl space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 bg-orange-100 rounded-xl shrink-0">
+                    <Sparkles className="w-5 h-5 text-orange-600" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-sm text-orange-900">Uninterrupted AI Access</h4>
+                    <p className="text-xs text-orange-700 mt-1 leading-relaxed">
+                      If you experience high demand or rate limits, you can provide your own Gemini API key. This ensures your "Architect Insights" are always available.
+                    </p>
+                  </div>
+                </div>
+                
+                <button 
+                  onClick={handleSelectKey}
+                  className={`w-full flex items-center justify-center gap-2 p-3 rounded-2xl font-bold text-xs transition-all ${
+                    hasKey 
+                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' 
+                      : 'bg-orange-500 text-white hover:bg-orange-600 shadow-md shadow-orange-200'
+                  }`}
+                >
+                  {hasKey ? (
+                    <>
+                      <CheckCircle2 size={16} />
+                      Personal API Key Active
+                    </>
+                  ) : (
+                    <>
+                      <Key size={16} />
+                      Select Personal API Key
+                    </>
+                  )}
+                </button>
+                
+                <p className="text-[9px] text-orange-400 text-center italic">
+                  Requires a paid Google Cloud project. See <a href="https://ai.google.dev/gemini-api/docs/billing" target="_blank" className="underline">billing docs</a>.
+                </p>
               </div>
             </div>
           </div>
